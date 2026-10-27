@@ -45,6 +45,10 @@ try {
   await createAgentLifecycle(db).requestHire(companyId, { id: agentId, name: "Monitor verifier", status: "active", adapterType: "paperclip_runner",
     adapterConfig: { provider: "codex", cwd, lifecycleMode: "warm", idleTimeoutMs: 300_000, timeoutSeconds: 180 },
     runtimeConfig: { heartbeat: { enabled: false, wakeOnDemand: true } } });
+  // This script owns a standalone lifecycle coordinator rather than the app's
+  // delivery queue. A requestHire schedules a wake, but the standalone
+  // coordinator has no queue consumer unless the smoke explicitly sweeps it.
+  await lifecycle.sweep();
   const setupDeadline = Date.now() + 3 * 60_000;
   while (true) {
     const agent = await createAgentLifecycle(db).get(agentId);
