@@ -264,6 +264,63 @@ export function buildNativeRunnerArguments(input: {
   ];
 }
 
+export type NativeRunnerEnvironmentEvidence = {
+  schemaVersion: "native-runner-environment.v1";
+  runtimePath: string;
+  platform: string;
+  nodeVersion: string;
+  opensslVersion: string;
+  opensslConfig: "accessible" | "unavailable" | "unset" | "unknown";
+  verification: "passed" | "failed";
+  executionScope: "local-native";
+  fallbackUsed: boolean;
+  fallbackName: string | null;
+  capturedAt: string;
+};
+
+function nativeRunnerEnvironmentEvidence(environment: NodeJS.ProcessEnv): NativeRunnerEnvironmentEvidence {
+  const configured = environment.OPENSSL_CONF?.trim() || null;
+  let opensslConfig: NativeRunnerEnvironmentEvidence["opensslConfig"] = "unset";
+  if (configured) {
+    try { accessSync(configured, constants.R_OK); opensslConfig = "accessible"; }
+    catch { opensslConfig = "unavailable"; }
+  }
+  return {
+    schemaVersion: "native-runner-environment.v1",
+    runtimePath: process.execPath,
+    platform: process.platform,
+    nodeVersion: process.version,
+    opensslVersion: process.versions.openssl ?? "unknown",
+    opensslConfig,
+    verification: "failed",
+    executionScope: "local-native",
+    fallbackUsed: Boolean(configured),
+    fallbackName: configured ? `OPENSSL_CONF=${configured}` : null,
+    capturedAt: new Date().toISOString(),
+  };
+}
+
+export function probeNativeRunnerEnvironment(environment: NodeJS.ProcessEnv): Promise<NativeRunnerEnvironmentEvidence> {
+  const evidence = nativeRunnerEnvironmentEvidence(environment);
+  return new Promise((resolve) => {
+    let settled = false;
+    const child = spawn(process.execPath, ["-e", "require('node:crypto').createHash('sha256').update('paperclip-native-runner-probe').digest('hex')"], {
+      cwd: process.cwd(),
+      env: { ...process.env, ...environment },
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+    const finish = (verification: NativeRunnerEnvironmentEvidence["verification"]) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ ...evidence, verification });
+    };
+    const timer = setTimeout(() => { child.kill("SIGKILL"); finish("failed"); }, 5_000);
+    child.once("error", () => finish("failed"));
+    child.once("close", (code) => finish(code === 0 ? "passed" : "failed"));
+  });
+}
+
 function privateDirectory(path: string): void {
   mkdirSync(path, { recursive: true, mode: 0o700 });
   if (process.platform !== "win32") chmodSync(path, 0o700);
@@ -421,6 +478,11 @@ export async function executeNativeCodexRunner(input: {
     prepared.queueCommand("turn.start", { text: input.prompt }, `turn_${input.runId}`);
   }
 
+  const nativeEnvironment = await probeNativeRunnerEnvironment({ ...process.env, ...input.environment } as Record<string, string>);
+  if (nativeEnvironment.verification === "failed") {
+    await prepared.release();
+    throw new Error("paperclip_native_runner_environment_failed");
+  }
   const child = spawn(binary, buildNativeRunnerArguments({
     connectUrl: prepared.connectUrl,
     stateDirectory: runnerStateDirectory,
@@ -520,6 +582,7 @@ export async function executeNativeCodexRunner(input: {
       sessionDisplayId: completed?.providerSessionId ?? input.normalizedSessionId,
       resultJson: {
         nativeRunner: {
+          environment: nativeEnvironment,
           ...(completed ? { result: completed.result, terminal: completed.terminal } : {}),
           ...(goalControl ? {
             goalControl: {
