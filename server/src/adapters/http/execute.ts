@@ -59,11 +59,13 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       ...(timer ? { signal: controller.signal } : {}),
     });
 
+    const responseText = await res.text();
     if (!res.ok) {
-      throw new Error(`HTTP invoke failed with status ${res.status}`);
+      const detail = responseText.trim().slice(0, 2_000);
+      throw new Error(`HTTP invoke failed with status ${res.status}${detail ? `: ${detail}` : ""}`);
     }
 
-    const resultJson = parseStructuredHttpResult(await res.text());
+    const resultJson = parseStructuredHttpResult(responseText);
 
     return {
       exitCode: 0,
