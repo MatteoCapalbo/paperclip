@@ -331,6 +331,19 @@ vi.mock("../issue-recovery-actions.js", () => ({
 vi.mock("./native-codex-runner.js", () => ({
   resolvePaperclipRunnerBinary: state.resolveRunnerBinary,
   resolveRemotePaperclipRunnerBinary: state.resolveRemoteRunnerBinary,
+  probeNativeRunnerEnvironment: vi.fn(async () => ({
+    schemaVersion: "native-runner-environment.v1" as const,
+    runtimePath: process.execPath,
+    platform: process.platform,
+    nodeVersion: process.version,
+    opensslVersion: process.versions.openssl ?? "unknown",
+    opensslConfig: "unset" as const,
+    verification: "passed" as const,
+    executionScope: "local-native" as const,
+    fallbackUsed: false,
+    fallbackName: null,
+    capturedAt: new Date().toISOString(),
+  })),
 }));
 
 import {
