@@ -2,6 +2,21 @@ import type { AdapterExecutionContext, AdapterExecutionResult } from "../types.j
 import { asString, asNumber, parseObject } from "../utils.js";
 import { guardedHttpAdapterFetch } from "./remote-fetch.js";
 
+export function parseStructuredHttpResult(responseText: string): Record<string, unknown> | undefined {
+  if (!responseText.trim()) return undefined;
+  if (responseText.length > 64 * 1024) {
+    throw new Error("HTTP adapter response exceeds the 64 KiB result limit");
+  }
+  try {
+    const parsed = JSON.parse(responseText);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExecutionResult> {
   const { config, runId, agent, context } = ctx;
   const url = asString(config.url, "");
@@ -42,11 +57,14 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       throw new Error(`HTTP invoke failed with status ${res.status}`);
     }
 
+    const resultJson = parseStructuredHttpResult(await res.text());
+
     return {
       exitCode: 0,
       signal: null,
       timedOut: false,
       summary: `HTTP ${method} ${url}`,
+      ...(resultJson ? { resultJson } : {}),
     };
   } catch (err) {
     if (timer && err instanceof Error && err.name === "AbortError") {

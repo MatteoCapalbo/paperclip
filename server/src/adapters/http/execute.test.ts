@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CONNECTION_INTENT_AGENT_GUIDANCE } from "@paperclipai/shared";
-import { execute } from "./execute.js";
+import { execute, parseStructuredHttpResult } from "./execute.js";
 
 const guardedFetchMock = vi.hoisted(() => vi.fn());
 
@@ -117,5 +117,16 @@ describe("http adapter execute", () => {
     expect(result.timedOut).toBe(true);
     expect(result.errorCode).toBe("timeout");
     expect(result.errorMessage).toContain("timed out after 1ms");
+  });
+
+  it("conserva una risposta JSON strutturata nel risultato del run", () => {
+    expect(parseStructuredHttpResult(JSON.stringify({ orchestrator: { terminal: "succeeded" } }))).toEqual({
+      orchestrator: { terminal: "succeeded" },
+    });
+  });
+
+  it("ignora una risposta non JSON e rifiuta payload troppo grandi", () => {
+    expect(parseStructuredHttpResult("ok")).toBeUndefined();
+    expect(() => parseStructuredHttpResult("x".repeat(64 * 1024 + 1))).toThrow("64 KiB");
   });
 });
