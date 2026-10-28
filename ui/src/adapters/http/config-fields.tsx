@@ -64,6 +64,19 @@ export function HttpConfigFields({
           placeholder='{"Authorization":"Bearer …"}'
         />
       </Field>
+      <Field label="Bearer token environment variable" hint="Optional uppercase environment variable name. Paperclip reads the token at run time and never stores its value in the agent configuration.">
+        <DraftInput
+          value={isCreate ? values?.bearerTokenEnv ?? "" : String(config.bearerTokenEnv ?? "")}
+          onCommit={(value) =>
+            isCreate
+              ? set?.({ bearerTokenEnv: value })
+              : mark("adapterConfig", "bearerTokenEnv", value.trim() || undefined)
+          }
+          immediate
+          className={inputClass}
+          placeholder="AGENT_ORCHESTRATOR_LOCAL_TOKEN"
+        />
+      </Field>
     </div>
   ));
 }

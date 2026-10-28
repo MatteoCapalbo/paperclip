@@ -5,6 +5,7 @@ export function buildHttpConfig(v: CreateConfigValues): Record<string, unknown> 
   if (v.url) ac.url = v.url;
   ac.method = "POST";
   ac.timeoutMs = 15000;
+  if (v.bearerTokenEnv?.trim()) ac.bearerTokenEnv = v.bearerTokenEnv.trim();
   for (const [key, raw] of [["headers", v.headersJson], ["payloadTemplate", v.payloadTemplateJson]] as const) {
     if (!raw?.trim()) continue;
     try {

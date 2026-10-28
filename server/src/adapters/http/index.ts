@@ -16,6 +16,7 @@ Core fields:
 - url (string, required): endpoint to invoke
 - method (string, optional): HTTP method, default POST
 - headers (object, optional): request headers
+- bearerTokenEnv (string, optional): environment variable containing a bearer token; the value is never persisted in agent configuration
 - payloadTemplate (object, optional): JSON payload template
 - timeoutSec (number, optional): request timeout in seconds
 `,

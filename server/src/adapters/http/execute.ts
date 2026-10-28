@@ -25,6 +25,11 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const method = asString(config.method, "POST");
   const timeoutMs = asNumber(config.timeoutMs, 0);
   const headers = parseObject(config.headers) as Record<string, string>;
+  const bearerTokenEnv = asString(config.bearerTokenEnv, "");
+  if (bearerTokenEnv && !/^[A-Z_][A-Z0-9_]*$/.test(bearerTokenEnv)) {
+    throw new Error("HTTP adapter bearerTokenEnv must be an uppercase environment variable name");
+  }
+  const bearerToken = bearerTokenEnv ? process.env[bearerTokenEnv]?.trim() : "";
   const payloadTemplate = parseObject(config.payloadTemplate);
   const body = {
     ...payloadTemplate,
@@ -48,6 +53,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       headers: {
         "content-type": "application/json",
         ...headers,
+        ...(bearerToken ? { authorization: `Bearer ${bearerToken}` } : {}),
       },
       body: JSON.stringify(body),
       ...(timer ? { signal: controller.signal } : {}),
