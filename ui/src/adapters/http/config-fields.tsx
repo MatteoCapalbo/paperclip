@@ -5,6 +5,7 @@ import {
   DraftInput,
   help,
 } from "../../components/agent-config-primitives";
+import { PayloadTemplateJsonField } from "../runtime-json-fields";
 
 const inputClass =
   "w-full rounded-md border border-border px-2.5 py-1.5 bg-transparent outline-none text-sm font-mono placeholder:text-muted-foreground/40";
@@ -19,22 +20,50 @@ export function HttpConfigFields({
   mark,
 }: AdapterConfigFieldsProps) {
   return configFieldsForSection(section, (
-    <Field label="Webhook URL" hint={help.webhookUrl}>
-      <DraftInput
-        value={
-          isCreate
-            ? values!.url
-            : eff("adapterConfig", "url", String(config.url ?? ""))
-        }
-        onCommit={(v) =>
-          isCreate
-            ? set!({ url: v })
-            : mark("adapterConfig", "url", v || undefined)
-        }
-        immediate
-        className={inputClass}
-        placeholder="https://..."
-      />
-    </Field>
+    <div className="space-y-4">
+      <Field label="Webhook URL" hint={help.webhookUrl}>
+        <DraftInput
+          value={
+            isCreate
+              ? values!.url
+              : eff("adapterConfig", "url", String(config.url ?? ""))
+          }
+          onCommit={(v) =>
+            isCreate
+              ? set!({ url: v })
+              : mark("adapterConfig", "url", v || undefined)
+          }
+          immediate
+          className={inputClass}
+          placeholder="https://..."
+        />
+      </Field>
+      <PayloadTemplateJsonField isCreate={isCreate} values={values} set={set} config={config} mark={mark} />
+      <Field label="Extra headers JSON" hint="Optional JSON object merged into the HTTP request headers. Use this for a bearer token or an internal bridge token.">
+        <DraftInput
+          value={isCreate ? values?.headersJson ?? "" : JSON.stringify(config.headers ?? {}, null, 2)}
+          onCommit={(value) => {
+            if (isCreate) {
+              set?.({ headersJson: value });
+              return;
+            }
+            const trimmed = value.trim();
+            if (!trimmed) {
+              mark("adapterConfig", "headers", undefined);
+              return;
+            }
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) mark("adapterConfig", "headers", parsed);
+            } catch {
+              // Keep invalid drafts local until the JSON is valid.
+            }
+          }}
+          immediate
+          className={inputClass}
+          placeholder='{"Authorization":"Bearer …"}'
+        />
+      </Field>
+    </div>
   ));
 }
